@@ -5,7 +5,7 @@ const video = $('video'), roiEl = $('roi'), work = $('work'), wctx = work.getCon
 
 /* ---------- Einstellungen ---------- */
 const DEF = { sound: 'siren', vol: 100, torch: true, interval: 2, sens: 3, repeat: true, vib: true, debug: false, zoom: 1,
-              roi: { x: 0.42, y: 0.35, w: 0.16, h: 0.14 }, system: 'ks', rois: {} };
+              roi: { x: 0.42, y: 0.35, w: 0.16, h: 0.14 }, system: 'ks', rois: {}, cal: {}, cam: 'protect', exp: -2, iso: 100, shutter: 20, wb: 'auto', ct: 5000 };
 /* Je Signalsystem ein eigenes, gemerktes Messfeld: Ks = eine Lampe (klein, quadratisch), Hl = mehrere Lampen übereinander (hochkant) */
 const PRESET = { ks: { x: 0.42, y: 0.35, w: 0.16, h: 0.14 }, hl: { x: 0.40, y: 0.26, w: 0.20, h: 0.36 } };
 let S = Object.assign({}, DEF);
@@ -26,6 +26,7 @@ async function startCamera() {
     track = stream.getVideoTracks()[0];
     await video.play().catch(() => {});
     setupZoom();
+    try { setupExposure(); } catch (e) { /* Kamera-Einstellungen sind optional und dürfen das Bild nie blockieren */ }
   } catch (err) {
     const app = !!(window.AndroidBridge && AndroidBridge.openSettings);
     $('camError').hidden = false;
@@ -48,6 +49,61 @@ function applyZoom() {
   $('zoomV').textContent = (+$('zoom').value).toFixed(1) + '×';
   if (track && track.applyConstraints) track.applyConstraints({ advanced: [{ zoom: +$('zoom').value }] }).catch(() => {});
 }
+/* ---------- Kamera: Belichtung (ISO / Zeit / Korrektur) und Weißabgleich ----------
+   Helle Lampen übersteuern den Sensor: Rot wirkt dann orange/gelb, der Kern weiß. Dunkler belichten und festen Weißabgleich nutzen
+   macht die Lampenfarben genauer. Welche Einstellungen gehen, bestimmt das Handy (getCapabilities), daher zeigt die App nur, was es kann. */
+const camCaps = () => (track && track.getCapabilities) ? track.getCapabilities() : {};
+const hasOpt = (c, k, v) => Array.isArray(c[k]) && c[k].includes(v);
+let camTimer = null;
+function slider(id, cap, val) { const el = $(id); el.min = cap.min; el.max = cap.max; el.step = cap.step || 1; el.value = clamp(val, cap.min, cap.max); }
+function camLabels() {
+  $('expV').textContent = (+$('exp').value > 0 ? '+' : '') + (+$('exp').value).toFixed(1) + ' EV';
+  $('isoV').textContent = 'ISO ' + Math.round(+$('iso').value);
+  $('shutV').textContent = '1/' + Math.round(10000 / Math.max(1, +$('shutter').value)) + ' s';
+  $('ctV').textContent = Math.round(+$('ct').value) + ' K';
+}
+function updateCamUI() {
+  const c = camCaps();
+  $('camMode').value = S.cam; $('wb').value = S.wb;
+  $('expRow').hidden = !(c.exposureCompensation && S.cam === 'protect');
+  $('isoRow').hidden = !(c.iso && S.cam === 'manual');
+  $('shutRow').hidden = !(c.exposureTime && S.cam === 'manual');
+  $('wbRow').hidden = !hasOpt(c, 'whiteBalanceMode', 'manual');
+  $('ctRow').hidden = !(S.wb === 'fixed' && c.colorTemperature);
+  const any = c.exposureCompensation || c.iso || c.exposureTime || hasOpt(c, 'exposureMode', 'manual') || hasOpt(c, 'whiteBalanceMode', 'manual');
+  if (!any) $('camState').textContent = 'Dieses Handy bzw. diese Kamera erlaubt keine Belichtungs-Einstellungen über die App.';
+  camLabels();
+}
+function setupExposure() {
+  const c = camCaps();
+  if (c.exposureCompensation) slider('exp', c.exposureCompensation, S.exp);
+  if (c.iso) slider('iso', c.iso, S.iso);
+  if (c.exposureTime) slider('shutter', c.exposureTime, S.shutter);
+  if (c.colorTemperature) slider('ct', c.colorTemperature, S.ct);
+  updateCamUI(); applyCamera();
+}
+async function applyCamera() {
+  if (!track || !track.applyConstraints) return;
+  const c = camCaps(), want = {}, bad = [];
+  if (S.cam === 'manual') {
+    if (hasOpt(c, 'exposureMode', 'manual')) want.exposureMode = 'manual';
+    if (c.exposureTime) want.exposureTime = +$('shutter').value;
+    if (c.iso) want.iso = +$('iso').value;
+  } else {
+    if (hasOpt(c, 'exposureMode', 'continuous')) want.exposureMode = 'continuous';
+    if (c.exposureCompensation) want.exposureCompensation = S.cam === 'protect' ? clamp(S.exp, c.exposureCompensation.min, c.exposureCompensation.max) : 0;
+  }
+  if (S.wb === 'fixed') { if (hasOpt(c, 'whiteBalanceMode', 'manual')) { want.whiteBalanceMode = 'manual'; if (c.colorTemperature) want.colorTemperature = +$('ct').value; } }
+  else if (hasOpt(c, 'whiteBalanceMode', 'continuous')) want.whiteBalanceMode = 'continuous';
+  for (const [k, v] of Object.entries(want)) { try { await track.applyConstraints({ advanced: [{ [k]: v }] }); } catch (e) { bad.push(k); } }
+  const st = track.getSettings ? track.getSettings() : {};
+  const shown = ['exposureMode', 'exposureTime', 'iso', 'exposureCompensation', 'whiteBalanceMode', 'colorTemperature'].filter(k => st[k] !== undefined).map(k => k + '=' + st[k]);
+  if (Object.keys(want).length) $('camState').textContent = 'Aktiv: ' + shown.join(', ') + (bad.length ? ' · nicht unterstützt: ' + bad.join(', ') : '');
+  if (typeof event === 'function') event('camera', { mode: S.cam, wb: S.wb, want, bad, settings: st });
+}
+function camChanged() { camLabels(); S.cam = $('camMode').value; S.wb = $('wb').value; S.exp = +$('exp').value; S.iso = +$('iso').value; S.shutter = +$('shutter').value; S.ct = +$('ct').value; save(); updateCamUI(); clearTimeout(camTimer); camTimer = setTimeout(applyCamera, 200); }
+['camMode', 'wb'].forEach(id => $(id).addEventListener('change', camChanged));
+['exp', 'iso', 'shutter', 'ct'].forEach(id => $(id).addEventListener('input', camChanged));
 $('zoom').addEventListener('input', () => { S.zoom = +$('zoom').value; applyZoom(); save(); });
 window.swRetryCamera = () => { if (!$('camError').hidden) startCamera(); };   // z. B. nach erteilter Erlaubnis oder Rückkehr aus den Einstellungen
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') window.swRetryCamera(); });
@@ -120,6 +176,13 @@ function roiToVideo() {
    NACHT-MODUS (automatisch, wenn das Messfeld insgesamt dunkel ist): LEDs belichten die Kamera oft bis fast Weiß aus.
    Dann zählen auch beinahe weiße Pixel mit leichtem Farbstich – so werden z. B. Hl-Signale in der Nacht erkannt.
    MISCHFARBE: Sind Gelb UND Grün gleichzeitig leuchtend (Hl-/Hp2-Bilder), wird "both" gemeldet. */
+/* Rot/Gelb-Grenze: Kameras sehen helle rote Lampen oft orange (Hue 20-35°). Standard 26°; am eigenen Handy anlernbar:
+   wurden Rot UND Gelb gelernt, liegt die Grenze in der Mitte (begrenzt auf 22-44°). */
+const BRY_DEFAULT = 26;
+function bRY() { const c = S.cal || {}; return (typeof c.red === 'number' && typeof c.yellow === 'number') ? clamp((c.red + c.yellow) / 2, 22, 44) : BRY_DEFAULT; }
+const medianOf = a => { if (!a.length) return null; const b = Float32Array.from(a).sort(); return b[b.length >> 1]; };
+/* Median-Farbton der HELLSTEN leuchtenden Pixel (>= 85 % der maximalen Helligkeit): die Lampe, nicht Monitorrand oder Wand */
+function topMedian(h, v) { if (!h.length) return null; let vm = 0; for (const x of v) if (x > vm) vm = x; const sel = []; for (let i = 0; i < h.length; i++) if (v[i] >= 0.85 * vm) sel.push(h[i]); return medianOf(sel); }
 function analyze() {
   const g = roiToVideo(); if (!g) return null;
   const long = 96, k = long / Math.max(g.sw, g.sh), cw = Math.max(4, Math.round(g.sw * k)), ch = Math.max(4, Math.round(g.sh * k));
@@ -130,6 +193,7 @@ function analyze() {
   const night = (sum / n / 255) < 0.30;
   const sMin = [0.55, 0.45, 0.36, 0.28, 0.20][S.sens - 1] * (night ? 0.8 : 1), vMin = [0.55, 0.45, 0.38, 0.30, 0.24][S.sens - 1];
   let R = 0, Y = 0, G = 0, W = 0;
+  const BRY = bRY(), litH = [], litV = [];   // lit: Farbtöne aller Rot/Gelb-artigen leuchtenden Pixel (Rot als negative Werte), fürs Anlernen
   const ySat = Math.max(sMin, night ? 0.40 : 0.50);
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255;
@@ -140,8 +204,8 @@ function analyze() {
     else if (s < sMin) continue;
     let h = mx === r ? ((gg - b) / df) % 6 : mx === gg ? (b - r) / df + 2 : (r - gg) / df + 4;
     h = (h * 60 + 360) % 360;
-    if (h <= 18 || h >= 335) R++;
-    else if (h <= 72) { if (hot || s >= ySat) Y++; }   // Gelb braucht kräftige Sättigung: Braun/Holz/Rost (Hue ~25-40°, s ~0.3) ist KEINE Lampe
+    if (h < BRY || h >= 335) { R++; litH.push(h >= 335 ? h - 360 : h); litV.push(mx); }
+    else if (h <= 72) { if (hot || s >= ySat) { Y++; litH.push(h); litV.push(mx); } }   // Gelb braucht kräftige Sättigung: Braun/Holz/Rost (Hue ~25-40°, s ~0.3) ist KEINE Lampe
     else if (h >= 73 && h <= 190) G++;
   }
   const HL = S.system === 'hl';   // Hl: mehrere kleinere Lampen im Feld, Gelb oft schwächer -> niedrigere Schwelle, Mischfarbe großzügiger
@@ -152,7 +216,7 @@ function analyze() {
   const go = Math.max(Y, G);
   if (c === 'red' && go >= minPx && go >= 0.6 * R) c = Y >= G ? 'yellow' : 'green';   // Rot+Gelb/Grün gemischt -> Fahrt
   if ((c === 'yellow' || c === 'green') && Y >= minPx && G >= minPx && Math.min(Y, G) >= (HL ? 0.25 : 0.5) * Math.max(Y, G)) c = 'both';
-  return { c, R, Y, G, W, n, night, lum: sum / n / 255 };
+  return { c, R, Y, G, W, n, night, lum: sum / n / 255, hl: topMedian(litH, litV), nl: litH.length };
 }
 
 /* ---------- Audio (laut: Vollaussteuerung + Kompressor, Töne im 2–3 kHz-Bereich, der Dieselgeräusch durchdringt) ---------- */
@@ -350,19 +414,19 @@ function snap(why) {                       // ROI-Bild (96 px, was die Erkennung
 }
 function updRec() { $('rec').textContent = `● REC  ${nRows} Messungen · ${nFrames} Bilder · ${(nBytes / 1048576).toFixed(1)} MB`; }
 
-/* Hue-Histogramm (12 Klassen à 30°) über alle halbwegs farbigen, hellen Pixel – Rohmaterial fürs Kalibrieren */
+/* Hue-Histogramm (36 Klassen à 10°) über alle halbwegs farbigen, hellen Pixel – Rohmaterial fürs Kalibrieren */
 function hueHist() {
-  const d = wctx.getImageData(0, 0, work.width, work.height).data, hb = new Array(12).fill(0);
+  const d = wctx.getImageData(0, 0, work.width, work.height).data, hb = new Array(36).fill(0);
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), df = mx - Math.min(r, g, b);
     if (mx < 0.2 || df / mx < 0.15) continue;
     let h = mx === r ? ((g - b) / df) % 6 : mx === g ? (b - r) / df + 2 : (r - g) / df + 4; h = (h * 60 + 360) % 360;
-    hb[Math.floor(h / 30) % 12]++;
+    hb[Math.floor(h / 10) % 36]++;
   }
   return hb;
 }
 function logTick(r) {
-  record({ sys: S.system, c: r.c, R: r.R, Y: r.Y, G: r.G, W: r.W, n: r.n, night: r.night ? 1 : 0, lum: r3(r.lum), hb: hueHist(), armed: armed ? 1 : 0, alarm: alarming ? 1 : 0 });
+  record({ sys: S.system, c: r.c, R: r.R, Y: r.Y, G: r.G, W: r.W, n: r.n, night: r.night ? 1 : 0, lum: r3(r.lum), hb: hueHist(), hl: r.hl === null ? null : r3(r.hl), bry: r3(bRY()), exp: S.exp, armed: armed ? 1 : 0, alarm: alarming ? 1 : 0 });
   if (r.c !== lastRaw && Date.now() - lastSnap > 2000) snap('wechsel:' + (lastRaw || '-') + '>' + r.c);
   else if (Date.now() - lastSnap > 15000) snap('periodisch');
   lastRaw = r.c;
@@ -382,8 +446,8 @@ async function exportLog() {
   chunks.forEach(c => c.k === 'e' ? rows.push(...c.rows.map(x => Object.assign({ sid: c.sid }, x))) : frames.push(c));
   const st = track && track.getSettings ? track.getSettings() : {};
   const meta = { app: 'SignalWache-TEST-1', exported: new Date().toISOString(), ua: navigator.userAgent, screen: [screen.width, screen.height, devicePixelRatio],
-    window: [innerWidth, innerHeight], video: [video.videoWidth, video.videoHeight], track: st, facing, settings: S,
-    hueBins: '12 Klassen à 30° ab 0°=Rot; hb[0]=0-30° (Rot/Orange), hb[1]=30-60 (Gelb), hb[2]=60-90, hb[3]=90-120 (Grün) …' };
+    window: [innerWidth, innerHeight], video: [video.videoWidth, video.videoHeight], track: st, caps: camCaps(), facing, settings: S,
+    hueBins: '36 Klassen à 10° ab 0°; hb[0]=0-10° (Rot), hb[2]=20-30 (Orange), hb[4]=40-50 (Gelb), hb[12]=120-130 (Grün) …; hl = Median-Farbton der leuchtenden Rot/Gelb-Pixel (Rot als negativ), bry = aktuelle Rot/Gelb-Grenze, exp = Belichtungskorrektur (EV)' };
   const json = JSON.stringify({ meta, rows, frames });
   const name = `signalwache-log-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
   const file = new File([json], name, { type: 'application/json' });
@@ -397,5 +461,33 @@ $('consentOk').onclick = () => { $('consent').hidden = true; event('session', { 
 dbAll().then(cs => { cs.forEach(c => { nBytes += JSON.stringify(c).length; if (c.k === 'e') nRows += c.rows.length; else nFrames++; }); updRec(); });
 
 /* ---------- Start ---------- */
+/* ---------- Farbkalibrierung am eigenen Handy ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function calMsg(t) { $('calMsg').textContent = t; }
+function updateCalUI() {
+  const c = S.cal || {}, hasR = typeof c.red === 'number', hasY = typeof c.yellow === 'number';
+  $('calState').textContent = hasR && hasY ? `Rot ${c.red.toFixed(0)}° · Gelb ${c.yellow.toFixed(0)}° → Grenze ${bRY().toFixed(0)}°`
+    : (hasR ? 'nur Rot gelernt – Gelb fehlt' : hasY ? 'nur Gelb gelernt – Rot fehlt' : `Standard (Grenze ${BRY_DEFAULT}°)`);
+}
+async function learnColor(which) {
+  calMsg('Messe … Lampe ruhig im Messfeld halten.');
+  const vals = [];
+  for (let i = 0; i < 8; i++) { const a = analyze(); if (a && a.hl !== null && a.nl >= Math.max(5, a.n * 0.004)) vals.push(a.hl); await sleep(120); }
+  const name = which === 'red' ? 'rote' : 'gelbe';
+  if (vals.length < 4) return calMsg(`Keine leuchtende ${name} Lampe im Messfeld gefunden. Messfeld genau über die Lampe legen und noch einmal versuchen.`);
+  vals.sort((a, b) => a - b); const h = Math.round(vals[vals.length >> 1] * 10) / 10;
+  if (which === 'red' && (h < -30 || h > 40)) return calMsg(`Gemessener Farbton ${h}° passt nicht zu Rot. Ist wirklich ein rotes Signal im Messfeld?`);
+  if (which === 'yellow' && (h < 25 || h > 75)) return calMsg(`Gemessener Farbton ${h}° passt nicht zu Gelb. Ist wirklich ein gelbes Signal im Messfeld?`);
+  const old = S.cal ? { ...S.cal } : {}; S.cal = { ...old, [which]: h };
+  if (typeof S.cal.red === 'number' && typeof S.cal.yellow === 'number' && S.cal.yellow - S.cal.red < 8) { S.cal = old; return calMsg('Rot und Gelb liegen zu dicht beieinander – Messung verworfen. Bitte prüfen, dass wirklich Rot bzw. Gelb leuchtet.'); }
+  save(); updateCalUI(); calMsg(`${which === 'red' ? 'Rot' : 'Gelb'} gelernt: ${h}°.`);
+  if (typeof event === 'function') event('calibration', { which, hue: h, bry: bRY() });
+}
+$('learnRed').onclick = () => learnColor('red');
+$('learnYellow').onclick = () => learnColor('yellow');
+$('calReset').onclick = () => { S.cal = {}; save(); updateCalUI(); calMsg('Zurückgesetzt auf Standard.'); if (typeof event === 'function') event('calibration', { reset: 1 }); };
+
+updateCalUI();
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 syncUI(); drawRoi(); startCamera();

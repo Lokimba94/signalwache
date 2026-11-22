@@ -73,12 +73,25 @@
     <label class="row col"><span>Empfindlichkeit <em id="sensV"></em></span>
       <input type="range" id="sens" min="1" max="5" step="1">
       <small>Höher = erkennt auch schwache/überstrahlte Lampen (Gelb), kann aber eher Fehlalarme geben.</small></label>
+    <div class="row col" id="camBox"><span>Kamera-Belichtung</span>
+      <select id="camMode"><option value="protect">Lichter schonen (empfohlen)</option><option value="auto">Automatisch</option><option value="manual">Manuell (ISO / Belichtungszeit)</option></select>
+      <small>Helle Lampen übersteuern die Kamera: Rot sieht dann orange/gelb aus. „Lichter schonen“ macht das Bild dunkler, die Lampenfarben werden genauer.</small>
+      <div class="sub" id="expRow" hidden><span>Belichtungskorrektur <em id="expV"></em></span><input type="range" id="exp" min="-2" max="2" step="0.5"></div>
+      <div class="sub" id="isoRow" hidden><span>ISO (Empfindlichkeit) <em id="isoV"></em></span><input type="range" id="iso" min="50" max="800" step="50"></div>
+      <div class="sub" id="shutRow" hidden><span>Belichtungszeit <em id="shutV"></em></span><input type="range" id="shutter" min="1" max="1000" step="1"></div>
+      <div class="sub" id="wbRow" hidden><span>Weißabgleich</span><select id="wb"><option value="auto">Automatisch</option><option value="fixed">Fest (stabilere Farben)</option></select></div>
+      <div class="sub" id="ctRow" hidden><span>Farbtemperatur <em id="ctV"></em></span><input type="range" id="ct" min="2000" max="8000" step="100"></div>
+      <small id="camState"></small></div>
     <label class="row col" id="zoomRow" hidden><span>Kamera-Zoom <em id="zoomV"></em></span>
       <input type="range" id="zoom" min="1" max="4" step="0.1"></label>
     <label class="row"><span>Alarm wiederholen bis quittiert</span><input type="checkbox" id="repeat"></label>
     <label class="row"><span>Blitzlicht bei Alarm (falls möglich)</span><input type="checkbox" id="torch"></label>
     <label class="row"><span>Vibration</span><input type="checkbox" id="vib"></label>
     <label class="row"><span>Messwerte anzeigen</span><input type="checkbox" id="debug"></label>
+    <div class="row col" id="calBox"><span>Farbkalibrierung <em id="calState"></em></span>
+      <small>Damit die App weiß, wie <b>dein Handy</b> Rot und Gelb sieht: Messfeld genau über eine <b>rote</b> Lampe legen und „Rot lernen“ tippen, später über eine <b>gelbe</b> Lampe und „Gelb lernen“. Nur lernen, wenn das Signal sicher diese Farbe zeigt.</small>
+      <div class="inline" style="flex-wrap:wrap"><button id="learnRed" class="small">Rot lernen</button><button id="learnYellow" class="small">Gelb lernen</button><button id="calReset" class="small">Zurücksetzen</button></div>
+      <small id="calMsg"></small></div>
     <button id="exportBtn" class="small wide">📤 Log teilen / speichern</button>
     <button id="clearLog" class="small wide">🗑 Log löschen</button>
     <button id="resetRoi" class="small wide">Messfeld zurücksetzen</button>
