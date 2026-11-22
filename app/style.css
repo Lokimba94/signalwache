@@ -106,3 +106,5 @@ select{background:#1e293b;color:var(--txt);border:1px solid var(--line);border-r
 .seg button{flex:1;padding:12px;border:1px solid var(--line);border-radius:12px;background:#1e293b;color:var(--txt);font-size:16px;font-weight:700}
 .seg button.on{background:var(--yel);color:#111;border-color:var(--yel)}
 .systag{margin-left:8px;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;background:rgba(250,204,21,.2);color:var(--yel)}
+
+.cam-actions{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}

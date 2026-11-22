@@ -27,8 +27,12 @@ async function startCamera() {
     await video.play().catch(() => {});
     setupZoom();
   } catch (err) {
+    const app = !!(window.AndroidBridge && AndroidBridge.openSettings);
     $('camError').hidden = false;
-    $('camError').textContent = 'Kamera nicht verfügbar: ' + (err.message || err.name) + '. Bitte Kamerazugriff erlauben (HTTPS nötig).';
+    $('camError').innerHTML = '<div id="camMsg"></div><div class="cam-actions"><button id="camRetry" class="small">Erneut versuchen</button>' + (app ? '<button id="camSet" class="small">App-Einstellungen</button>' : '') + '</div>';
+    $('camMsg').textContent = 'Kamera nicht verfügbar: ' + (err.message || err.name) + (app ? '. Bitte die Kamera-Erlaubnis geben (Erneut versuchen, oder in den App-Einstellungen unter Berechtigungen → Kamera).' : '. Bitte Kamerazugriff erlauben (HTTPS nötig).');
+    $('camRetry').onclick = () => { if (window.AndroidBridge && AndroidBridge.requestCamera) AndroidBridge.requestCamera(); else startCamera(); };
+    if (app) $('camSet').onclick = () => AndroidBridge.openSettings();
   }
 }
 function setupZoom() {
@@ -45,6 +49,8 @@ function applyZoom() {
   if (track && track.applyConstraints) track.applyConstraints({ advanced: [{ zoom: +$('zoom').value }] }).catch(() => {});
 }
 $('zoom').addEventListener('input', () => { S.zoom = +$('zoom').value; applyZoom(); save(); });
+window.swRetryCamera = () => { if (!$('camError').hidden) startCamera(); };   // z. B. nach erteilter Erlaubnis oder Rückkehr aus den Einstellungen
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') window.swRetryCamera(); });
 $('camBtn').onclick = () => { facing = facing === 'environment' ? 'user' : 'environment'; startCamera(); };
 
 /* ---------- ROI: Anzeige, Verschieben, Größe, Pinch ---------- */
