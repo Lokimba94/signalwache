@@ -25,7 +25,7 @@
 </head>
 <body>
 <main>
-  <h1>SignalWache <span class="tag">TEST</span></h1>
+  <h1 id="h1">SignalWache <span class="tag">TEST</span></h1>
   <p class="sub">Signalerkennung per Handy-Kamera – nur im Stand benutzen.</p>
 
   <a class="btn" id="dl" href="SignalWache-TEST.apk" download>⬇ App herunterladen (Android)</a>
@@ -62,6 +62,9 @@
 <script>
   fetch('version.json?t=' + Date.now()).then(r => r.json()).then(v => {
     document.getElementById('ver').textContent = 'Neueste Version: ' + v.versionName + (v.notes ? ' – ' + v.notes : '');
+    document.getElementById('h1').innerHTML = 'SignalWache v' + v.versionName + ' <span class="tag">TEST</span>';
+    document.title = 'SignalWache v' + v.versionName + ' – App herunterladen';
+    document.getElementById('dl').setAttribute('download', 'SignalWache-v' + v.versionName + '.apk');
   }).catch(() => {});
 </script>
 </body>
