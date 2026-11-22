@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>SignalWache – App herunterladen</title>
+<style>
+  :root{--bg:#0b1220;--card:#111a2e;--line:rgba(255,255,255,.14);--txt:#f1f5f9;--mut:#94a3b8;--grn:#10b981}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  main{max-width:560px;margin:0 auto;padding:28px 16px 48px}
+  h1{font-size:28px;margin:0 0 4px}
+  .sub{color:var(--mut);margin:0 0 22px}
+  .tag{display:inline-block;background:#f97316;color:#000;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:800;vertical-align:middle}
+  .btn{display:block;text-align:center;background:linear-gradient(180deg,#10b981,#059669);color:#fff;text-decoration:none;font-size:22px;font-weight:800;padding:20px 12px;border-radius:18px;box-shadow:0 0 22px rgba(16,185,129,.4)}
+  .meta{text-align:center;color:var(--mut);font-size:14px;margin:8px 0 26px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin:14px 0}
+  .card h2{font-size:17px;margin:0 0 8px}
+  ol{margin:0;padding-left:22px} li{margin:6px 0}
+  .warn{border-color:#f59e0b}
+  small,.mut{color:var(--mut)}
+  a{color:#7dd3fc}
+</style>
+</head>
+<body>
+<main>
+  <h1>SignalWache <span class="tag">TEST</span></h1>
+  <p class="sub">Signalerkennung per Handy-Kamera – nur im Stand benutzen.</p>
+
+  <a class="btn" id="dl" href="SignalWache-TEST.apk" download>⬇ App herunterladen (Android)</a>
+  <div class="meta" id="ver">Neueste Version</div>
+
+  <div class="card">
+    <h2>So installierst du die App</h2>
+    <ol>
+      <li>Auf den grünen Knopf tippen. Die Datei wird heruntergeladen.</li>
+      <li>Die heruntergeladene Datei <b>SignalWache-TEST.apk</b> öffnen (Benachrichtigung antippen oder im Ordner „Downloads“).</li>
+      <li>Wenn Android fragt: <b>„Aus dieser Quelle installieren“ erlauben</b>, dann auf <b>Installieren</b> tippen.</li>
+      <li>App öffnen, Kamera erlauben, fertig.</li>
+    </ol>
+    <p class="mut">Wenn Google „Play Protect“ eine Warnung zeigt: Das ist normal, weil die App nicht aus dem Play Store kommt. Auf „Trotzdem installieren“ tippen.</p>
+  </div>
+
+  <div class="card">
+    <h2>Updates</h2>
+    <p style="margin:0">Du musst hier nicht wieder herkommen. Wenn es eine neue Version gibt, meldet die App das beim Öffnen von selbst („Veraltete Version“) und lädt sie mit einem Tipp.</p>
+  </div>
+
+  <div class="card warn">
+    <h2>Wichtig</h2>
+    <p style="margin:0">Das ist eine Testversion. Sie <b>zeichnet Messwerte und kleine Kamerabilder auf</b>, bis du sie über „Log teilen“ selbst verschickst. Nur im Stand benutzen. Kein Ersatz für den Blick auf das Signal.</p>
+  </div>
+
+  <p class="mut" style="text-align:center"><small>Kein Android? <a href="app/">Im Browser öffnen</a> (eingeschränkt)</small></p>
+</main>
+<script>
+  fetch('version.json?t=' + Date.now()).then(r => r.json()).then(v => {
+    document.getElementById('ver').textContent = 'Neueste Version: ' + v.versionName + (v.notes ? ' – ' + v.notes : '');
+  }).catch(() => {});
+</script>
+</body>
+</html>

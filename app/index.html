@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SignalWache TEST</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<video id="video" autoplay playsinline muted></video>
+
+<!-- Messfeld (ROI) -->
+<div id="roi" data-state="none" aria-label="Messfeld">
+  <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+  <span class="h tl"></span><span class="h tr"></span><span class="h bl"></span><span class="h br"></span>
+  <span id="roiTag" class="roi-tag">Messfeld</span>
+</div>
+<div id="hint" class="hint">Messfeld verschieben &amp; über Ecken in der Größe ziehen – nur über die eigene Signallampe legen.</div>
+
+<canvas id="work" hidden></canvas>
+
+<header class="glass top">
+  <div class="brand"><span id="led" class="led"></span><b>SignalWache <small class="testtag">TEST</small></b><span class="systag" id="sysTag">Ks</span></div>
+  <div class="top-actions">
+    <span class="badge" id="wakeBadge" title="Standby-Schutz">🔒 Wach</span>
+    <button id="camBtn" class="icon" aria-label="Kamera wechseln">🔄</button>
+    <button id="setBtn" class="icon" aria-label="Einstellungen">⚙️</button>
+  </div>
+</header>
+
+<div id="rec" class="rec">● REC  0 Messungen · 0 Bilder</div>
+<div id="labels" class="labels"><span>Was zeigt das Signal WIRKLICH?</span><div>
+<button data-l="red">ROT</button><button data-l="yellow">GELB</button><button data-l="green">GRÜN</button><button data-l="green+yellow">GRÜN+GELB</button><button data-l="off">AUS</button><button data-l="false_alarm">⚠ Fehlalarm</button></div></div>
+<div id="labelToast" class="toast"></div>
+<div id="alarm" class="alarm" hidden>
+  <div class="alarm-in"><div class="alarm-big">FAHRT FREI!</div><div id="alarmSub">Signal</div><small>Eigenes Signal selbst prüfen! Zum Quittieren 1 Sekunde gedrückt halten</small></div>
+</div>
+
+<div id="camError" class="cam-error" hidden></div>
+
+<footer class="glass dock">
+  <div id="status" class="status" data-state="idle">Bereit – Messfeld über das Signal legen</div>
+  <div id="meter" class="meter" hidden></div>
+  <button id="mainBtn" class="main start">▶ WACHE STARTEN</button>
+  <button id="exportBtn2" class="exp">📤 Log teilen</button>
+</footer>
+
+<section id="sheet" class="sheet" aria-hidden="true">
+  <div class="sheet-bar"><b>Einstellungen</b><button id="closeSheet" class="icon">✕</button></div>
+  <div class="sheet-body">
+    <div class="row col"><span>Signalsystem</span>
+      <div class="seg" id="sysSeg"><button data-s="ks">KS-Signale</button><button data-s="hl">Hl-Signale</button></div>
+      <small id="sysInfo"></small></div>
+    <label class="row"><span>Alarmton</span>
+      <select id="sound">
+        <option value="siren">Sirene (sehr laut, Standard)</option>
+        <option value="fanfare">Signal-Fanfare (C-Dur)</option>
+        <option value="bell">Eisenbahn-Glocke</option>
+        <option value="warn">Warnton (Doppelpiep)</option>
+        <option value="voice">Sprachansage „Signal Fahrt frei“</option>
+      </select></label>
+    <label class="row col"><span>Lautstärke <em id="volV"></em></span>
+      <div class="inline"><input type="range" id="vol" min="0" max="100" step="1"><button id="testBtn" class="small">Test</button></div></label>
+    <label class="row col"><span>Prüf-Intervall bei Rot <em id="intV"></em></span>
+      <input type="range" id="interval" min="0.5" max="4" step="0.5"></label>
+    <label class="row col"><span>Empfindlichkeit <em id="sensV"></em></span>
+      <input type="range" id="sens" min="1" max="5" step="1">
+      <small>Höher = erkennt auch schwache/überstrahlte Lampen (Gelb), kann aber eher Fehlalarme geben.</small></label>
+    <label class="row col" id="zoomRow" hidden><span>Kamera-Zoom <em id="zoomV"></em></span>
+      <input type="range" id="zoom" min="1" max="4" step="0.1"></label>
+    <label class="row"><span>Alarm wiederholen bis quittiert</span><input type="checkbox" id="repeat"></label>
+    <label class="row"><span>Blitzlicht bei Alarm (falls möglich)</span><input type="checkbox" id="torch"></label>
+    <label class="row"><span>Vibration</span><input type="checkbox" id="vib"></label>
+    <label class="row"><span>Messwerte anzeigen</span><input type="checkbox" id="debug"></label>
+    <button id="exportBtn" class="small wide">📤 Log teilen / speichern</button>
+    <button id="clearLog" class="small wide">🗑 Log löschen</button>
+    <button id="resetRoi" class="small wide">Messfeld zurücksetzen</button>
+  </div>
+</section>
+<div id="scrim" class="scrim" hidden></div>
+
+<div id="consent" class="consent"><div class="consent-in"><h2>⚠ Testversion</h2><p>Diese Version <b>zeichnet während der Nutzung auf</b>: Farbwerte des Messfelds, Einstellungen, Zeitstempel sowie kleine Kamera-Standbilder (Messfeld und Gesamtbild). Die Daten bleiben auf dem Handy, bis du sie über „Log teilen“ selbst verschickst. Kein Standort, keine Tonaufnahme.</p><p>Nur im Stand benutzen (Halt vor dem Signal). Wenn du das Signal siehst, drücke die Wahrheits-Taste, die zeigt, was es wirklich anzeigt.</p><p><b>Kein Ersatz für den Blick auf das Signal.</b></p><button id="consentOk" class="main start">Verstanden</button></div></div>
+<script src="app.js"></script>
+</body>
+</html>
