@@ -1,6 +1,6 @@
 {
     "versionCode":  3,
-    "versionName":  "test-3",
+    "versionName":  "0.0.2",
     "apk":  "https://lokimba94.github.io/signalwache/SignalWache-TEST.apk",
-    "notes":  "Update-Hinweis mit „Später erinnern“, „Version überspringen“ und Update-Suche in den Einstellungen"
+    "notes":  "Erste Version mit automatischen Updates, Ks- und Hl-Profilen und Aufzeichnung für Tests"
 }
